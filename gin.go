@@ -9,8 +9,6 @@ import (
 	"net"
 	"net/http"
 	"path"
-	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin/internal/bytesconv"
@@ -344,83 +342,10 @@ func iterate(path, method string, routes RoutesInfo, root *node) RoutesInfo {
 func (engine *Engine) Run(addr ...string) (err error) {
 	defer func() { debugPrintError(err) }()
 
-	if engine.isUnsafeTrustedProxies() {
-		debugPrint("[WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.\n" +
-			"Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.")
-	}
-
 	address := resolveAddress(addr)
 	debugPrint("Listening and serving HTTP on %s\n", address)
 	err = http.ListenAndServe(address, engine)
 	return
-}
-
-func (engine *Engine) prepareTrustedCIDRs() ([]*net.IPNet, error) {
-	if engine.trustedProxies == nil {
-		return nil, nil
-	}
-
-	cidr := make([]*net.IPNet, 0, len(engine.trustedProxies))
-	for _, trustedProxy := range engine.trustedProxies {
-		if !strings.Contains(trustedProxy, "/") {
-			ip := parseIP(trustedProxy)
-			if ip == nil {
-				return cidr, &net.ParseError{Type: "IP address", Text: trustedProxy}
-			}
-
-			switch len(ip) {
-			case net.IPv4len:
-				trustedProxy += "/32"
-			case net.IPv6len:
-				trustedProxy += "/128"
-			}
-		}
-		_, cidrNet, err := net.ParseCIDR(trustedProxy)
-		if err != nil {
-			return cidr, err
-		}
-		cidr = append(cidr, cidrNet)
-	}
-	return cidr, nil
-}
-
-// SetTrustedProxies set a list of network origins (IPv4 addresses,
-// IPv4 CIDRs, IPv6 addresses or IPv6 CIDRs) from which to trust
-// request's headers that contain alternative client IP when
-// `(*gin.Engine).ForwardedByClientIP` is `true`. `TrustedProxies`
-// feature is enabled by default, and it also trusts all proxies
-// by default. If you want to disable this feature, use
-// Engine.SetTrustedProxies(nil), then Context.ClientIP() will
-// return the remote address directly.
-func (engine *Engine) SetTrustedProxies(trustedProxies []string) error {
-	engine.trustedProxies = trustedProxies
-	return engine.parseTrustedProxies()
-}
-
-// isUnsafeTrustedProxies compares Engine.trustedCIDRs and defaultTrustedCIDRs, it's not safe if equal (returns true)
-func (engine *Engine) isUnsafeTrustedProxies() bool {
-	return reflect.DeepEqual(engine.trustedCIDRs, defaultTrustedCIDRs)
-}
-
-// parseTrustedProxies parse Engine.trustedProxies to Engine.trustedCIDRs
-func (engine *Engine) parseTrustedProxies() error {
-	trustedCIDRs, err := engine.prepareTrustedCIDRs()
-	engine.trustedCIDRs = trustedCIDRs
-	return err
-}
-
-// parseIP parse a string representation of an IP and returns a net.IP with the
-// minimum byte representation or nil if input is invalid.
-func parseIP(ip string) net.IP {
-	parsedIP := net.ParseIP(ip)
-
-	if ipv4 := parsedIP.To4(); ipv4 != nil {
-		// return ip in a 4-byte representation
-		return ipv4
-	}
-
-	// return ip in a 16-byte representation or nil
-	return parsedIP
 }
 
 // RunTLS attaches the router to a http.Server and starts listening and serving HTTPS (secure) requests.
@@ -430,30 +355,10 @@ func (engine *Engine) RunTLS(addr, certFile, keyFile string) (err error) {
 	debugPrint("Listening and serving HTTPS on %s\n", addr)
 	defer func() { debugPrintError(err) }()
 
-	if engine.isUnsafeTrustedProxies() {
-		debugPrint("[WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.\n" +
-			"Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.")
-	}
-
 	err = http.ListenAndServeTLS(addr, certFile, keyFile, engine)
 	return
 }
 
-
-// RunListener attaches the router to a http.Server and starts listening and serving HTTP requests
-// through the specified net.Listener
-func (engine *Engine) RunListener(listener net.Listener) (err error) {
-	debugPrint("Listening and serving HTTP on listener what's bind with address@%s", listener.Addr())
-	defer func() { debugPrintError(err) }()
-
-	if engine.isUnsafeTrustedProxies() {
-		debugPrint("[WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.\n" +
-			"Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.")
-	}
-
-	err = http.Serve(listener, engine)
-	return
-}
 
 // ServeHTTP conforms to the http.Handler interface.
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
