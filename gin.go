@@ -5,11 +5,9 @@
 package gin
 
 import (
-	"fmt"
 	"html/template"
 	"net"
 	"net/http"
-	"os"
 	"path"
 	"reflect"
 	"strings"
@@ -441,50 +439,6 @@ func (engine *Engine) RunTLS(addr, certFile, keyFile string) (err error) {
 	return
 }
 
-// RunUnix attaches the router to a http.Server and starts listening and serving HTTP requests
-// through the specified unix socket (ie. a file).
-// Note: this method will block the calling goroutine indefinitely unless an error happens.
-func (engine *Engine) RunUnix(file string) (err error) {
-	debugPrint("Listening and serving HTTP on unix:/%s", file)
-	defer func() { debugPrintError(err) }()
-
-	if engine.isUnsafeTrustedProxies() {
-		debugPrint("[WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.\n" +
-			"Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.")
-	}
-
-	listener, err := net.Listen("unix", file)
-	if err != nil {
-		return
-	}
-	defer listener.Close()
-	defer os.Remove(file)
-
-	err = http.Serve(listener, engine)
-	return
-}
-
-// RunFd attaches the router to a http.Server and starts listening and serving HTTP requests
-// through the specified file descriptor.
-// Note: this method will block the calling goroutine indefinitely unless an error happens.
-func (engine *Engine) RunFd(fd int) (err error) {
-	debugPrint("Listening and serving HTTP on fd@%d", fd)
-	defer func() { debugPrintError(err) }()
-
-	if engine.isUnsafeTrustedProxies() {
-		debugPrint("[WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.\n" +
-			"Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.")
-	}
-
-	f := os.NewFile(uintptr(fd), fmt.Sprintf("fd@%d", fd))
-	listener, err := net.FileListener(f)
-	if err != nil {
-		return
-	}
-	defer listener.Close()
-	err = engine.RunListener(listener)
-	return
-}
 
 // RunListener attaches the router to a http.Server and starts listening and serving HTTP requests
 // through the specified net.Listener
