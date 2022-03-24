@@ -143,20 +143,6 @@ func (group *RouterGroup) Any(relativePath string, handlers ...HandlerFunc) IRou
 	return group.returnObj()
 }
 
-// StaticFile registers a single route in order to serve a single file of the local filesystem.
-// router.StaticFile("favicon.ico", "./resources/favicon.ico")
-func (group *RouterGroup) StaticFile(relativePath, filepath string) IRoutes {
-	if strings.Contains(relativePath, ":") || strings.Contains(relativePath, "*") {
-		panic("URL parameters can not be used when serving a static file")
-	}
-	handler := func(c *Context) {
-		c.File(filepath)
-	}
-	group.GET(relativePath, handler)
-	group.HEAD(relativePath, handler)
-	return group.returnObj()
-}
-
 // Static serves files from the given file system root.
 // Internally a http.FileServer is used, therefore http.NotFound is used instead
 // of the Router's NotFound handler.

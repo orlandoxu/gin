@@ -1030,22 +1030,6 @@ func (c *Context) DataFromReader(code int, contentLength int64, contentType stri
 	})
 }
 
-// File writes the specified file into the body stream in an efficient way.
-func (c *Context) File(filepath string) {
-	http.ServeFile(c.Writer, c.Request, filepath)
-}
-
-// FileFromFS writes the specified file from http.FileSystem into the body stream in an efficient way.
-func (c *Context) FileFromFS(filepath string, fs http.FileSystem) {
-	defer func(old string) {
-		c.Request.URL.Path = old
-	}(c.Request.URL.Path)
-
-	c.Request.URL.Path = filepath
-
-	http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
-}
-
 // FileAttachment writes the specified file into the body stream in an efficient way
 // On the client side, the file will typically be downloaded with the given filename
 func (c *Context) FileAttachment(filepath, filename string) {
