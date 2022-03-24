@@ -23,7 +23,6 @@ type HTMLRender interface {
 	Instance(string, interface{}) Render
 }
 
-// HTMLProduction contains template reference and its delims.
 type HTMLProduction struct {
 	Template *template.Template
 	Delims   Delims

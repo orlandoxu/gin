@@ -56,9 +56,6 @@ const (
 	// When running on Google App Engine. Trust X-Appengine-Remote-Addr
 	// for determining the client's IP
 	PlatformGoogleAppEngine = "X-Appengine-Remote-Addr"
-	// When using Cloudflare's CDN. Trust CF-Connecting-IP for determining
-	// the client's IP
-	PlatformCloudflare = "CF-Connecting-IP"
 )
 
 // Engine is the framework's instance, it contains the muxer, middleware and configuration settings.
@@ -211,43 +208,6 @@ func (engine *Engine) Delims(left, right string) *Engine {
 func (engine *Engine) SecureJsonPrefix(prefix string) *Engine {
 	engine.secureJSONPrefix = prefix
 	return engine
-}
-
-// LoadHTMLGlob loads HTML files identified by glob pattern
-// and associates the result with HTML renderer.
-func (engine *Engine) LoadHTMLGlob(pattern string) {
-	left := engine.delims.Left
-	right := engine.delims.Right
-	templ := template.Must(template.New("").Delims(left, right).Funcs(engine.FuncMap).ParseGlob(pattern))
-
-	if IsDebugging() {
-		debugPrintLoadTemplate(templ)
-		engine.HTMLRender = render.HTMLDebug{Glob: pattern, FuncMap: engine.FuncMap, Delims: engine.delims}
-		return
-	}
-
-	engine.SetHTMLTemplate(templ)
-}
-
-// LoadHTMLFiles loads a slice of HTML files
-// and associates the result with HTML renderer.
-func (engine *Engine) LoadHTMLFiles(files ...string) {
-	if IsDebugging() {
-		engine.HTMLRender = render.HTMLDebug{Files: files, FuncMap: engine.FuncMap, Delims: engine.delims}
-		return
-	}
-
-	templ := template.Must(template.New("").Delims(engine.delims.Left, engine.delims.Right).Funcs(engine.FuncMap).ParseFiles(files...))
-	engine.SetHTMLTemplate(templ)
-}
-
-// SetHTMLTemplate associate a template with HTML renderer.
-func (engine *Engine) SetHTMLTemplate(templ *template.Template) {
-	if len(engine.trees) > 0 {
-		debugPrintWARNINGSetHTMLTemplate()
-	}
-
-	engine.HTMLRender = render.HTMLProduction{Template: templ.Funcs(engine.FuncMap)}
 }
 
 // SetFuncMap sets the FuncMap used for template.FuncMap.
