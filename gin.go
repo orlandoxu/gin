@@ -186,7 +186,6 @@ func New() *Engine {
 
 // Default returns an Engine instance with the Logger and Recovery middleware already attached.
 func Default() *Engine {
-	debugPrintWARNINGDefault()
 	engine := New()
 	engine.Use(Logger(), Recovery())
 	return engine
