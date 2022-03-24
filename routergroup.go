@@ -143,56 +143,6 @@ func (group *RouterGroup) Any(relativePath string, handlers ...HandlerFunc) IRou
 	return group.returnObj()
 }
 
-// Static serves files from the given file system root.
-// Internally a http.FileServer is used, therefore http.NotFound is used instead
-// of the Router's NotFound handler.
-// To use the operating system's file system implementation,
-// use :
-//     router.Static("/static", "/var/www")
-func (group *RouterGroup) Static(relativePath, root string) IRoutes {
-	return group.StaticFS(relativePath, Dir(root, false))
-}
-
-// StaticFS works just like `Static()` but a custom `http.FileSystem` can be used instead.
-// Gin by default user: gin.Dir()
-func (group *RouterGroup) StaticFS(relativePath string, fs http.FileSystem) IRoutes {
-	if strings.Contains(relativePath, ":") || strings.Contains(relativePath, "*") {
-		panic("URL parameters can not be used when serving a static folder")
-	}
-	handler := group.createStaticHandler(relativePath, fs)
-	urlPattern := path.Join(relativePath, "/*filepath")
-
-	// Register GET and HEAD handlers
-	group.GET(urlPattern, handler)
-	group.HEAD(urlPattern, handler)
-	return group.returnObj()
-}
-
-func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {
-	absolutePath := group.calculateAbsolutePath(relativePath)
-	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
-
-	return func(c *Context) {
-		if _, noListing := fs.(*onlyFilesFS); noListing {
-			c.Writer.WriteHeader(http.StatusNotFound)
-		}
-
-		file := c.Param("filepath")
-		// Check if file exists and/or if we have permission to access it
-		f, err := fs.Open(file)
-		if err != nil {
-			c.Writer.WriteHeader(http.StatusNotFound)
-			c.handlers = group.engine.noRoute
-			// Reset index
-			c.index = -1
-			return
-		}
-		f.Close()
-
-		fileServer.ServeHTTP(c.Writer, c.Request)
-	}
-}
-
 func (group *RouterGroup) combineHandlers(handlers HandlersChain) HandlersChain {
 	finalSize := len(group.Handlers) + len(handlers)
 	if finalSize >= int(abortIndex) {
