@@ -8,10 +8,8 @@ import (
 	"html/template"
 	"net"
 	"net/http"
-	"path"
 	"sync"
 
-	"github.com/gin-gonic/gin/internal/bytesconv"
 	"github.com/gin-gonic/gin/render"
 )
 
@@ -21,8 +19,6 @@ var (
 	default404Body = []byte("404 page not found")
 	default405Body = []byte("405 method not allowed")
 )
-
-var defaultPlatform string
 
 var defaultTrustedCIDRs = []*net.IPNet{{IP: net.IP{0x0, 0x0, 0x0, 0x0}, Mask: net.IPMask{0x0, 0x0, 0x0, 0x0}}} // 0.0.0.0/0
 
@@ -51,66 +47,22 @@ type RouteInfo struct {
 // RoutesInfo defines a RouteInfo array.
 type RoutesInfo []RouteInfo
 
-// Trusted platforms
-const (
-	// When running on Google App Engine. Trust X-Appengine-Remote-Addr
-	// for determining the client's IP
-	PlatformGoogleAppEngine = "X-Appengine-Remote-Addr"
-)
-
 // Engine is the framework's instance, it contains the muxer, middleware and configuration settings.
 // Create an instance of Engine, by using New() or Default()
 type Engine struct {
 	RouterGroup
-
-	// Enables automatic redirection if the current route can't be matched but a
-	// handler for the path with (without) the trailing slash exists.
-	// For example if /foo/ is requested but a route only exists for /foo, the
-	// client is redirected to /foo with http status code 301 for GET requests
-	// and 307 for all other request methods.
-	RedirectTrailingSlash bool
-
-	// If enabled, the router tries to fix the current request path, if no
-	// handle is registered for it.
-	// First superfluous path elements like ../ or // are removed.
-	// Afterwards the router does a case-insensitive lookup of the cleaned path.
-	// If a handle can be found for this route, the router makes a redirection
-	// to the corrected path with status code 301 for GET requests and 307 for
-	// all other request methods.
-	// For example /FOO and /..//Foo could be redirected to /foo.
-	// RedirectTrailingSlash is independent of this option.
-	RedirectFixedPath bool
-
-	// If enabled, the router checks if another method is allowed for the
-	// current route, if the current request can not be routed.
-	// If this is the case, the request is answered with 'Method Not Allowed'
-	// and HTTP status code 405.
-	// If no other Method is allowed, the request is delegated to the NotFound
-	// handler.
-	HandleMethodNotAllowed bool
-
 	// If enabled, client IP will be parsed from the request's headers that
 	// match those stored at `(*gin.Engine).RemoteIPHeaders`. If no IP was
 	// fetched, it falls back to the IP obtained from
 	// `(*gin.Context).Request.RemoteAddr`.
 	ForwardedByClientIP bool
 
-	// DEPRECATED: USE `TrustedPlatform` WITH VALUE `gin.GoogleAppEngine` INSTEAD
-	// #726 #755 If enabled, it will trust some headers starting with
-	// 'X-AppEngine...' for better integration with that PaaS.
-	AppEngine bool
-
 	// If enabled, the url.RawPath will be used to find parameters.
 	UseRawPath bool
 
 	// If true, the path value will be unescaped.
-	// If UseRawPath is false (by default), the UnescapePathValues effectively is true,
 	// as url.Path gonna be used, which is already unescaped.
 	UnescapePathValues bool
-
-	// RemoveExtraSlash a parameter can be parsed from the URL even with extra slashes.
-	// See the PR #1817 and issue #1644
-	RemoveExtraSlash bool
 
 	// List of headers used to obtain the client IP when
 	// `(*gin.Engine).ForwardedByClientIP` is `true` and
@@ -118,39 +70,31 @@ type Engine struct {
 	// network origins of list defined by `(*gin.Engine).SetTrustedProxies()`.
 	RemoteIPHeaders []string
 
-	// If set to a constant of value gin.Platform*, trusts the headers set by
-	// that platform, for example to determine the client IP
-	TrustedPlatform string
-
 	// Value of 'maxMemory' param that is given to http.Request's ParseMultipartForm
 	// method call.
 	MaxMultipartMemory int64
 
 	delims           render.Delims
 	secureJSONPrefix string
-	HTMLRender       render.HTMLRender
-	FuncMap          template.FuncMap
-	allNoRoute       HandlersChain
-	allNoMethod      HandlersChain
-	noRoute          HandlersChain
-	noMethod         HandlersChain
-	pool             sync.Pool
-	trees            methodTrees
-	maxParams        uint16
-	maxSections      uint16
-	trustedProxies   []string
-	trustedCIDRs     []*net.IPNet
+	//HTMLRender       render.HTMLRender
+	FuncMap        template.FuncMap
+	allNoRoute     HandlersChain
+	allNoMethod    HandlersChain
+	noRoute        HandlersChain
+	noMethod       HandlersChain
+	pool           sync.Pool
+	trees          methodTrees
+	maxParams      uint16
+	maxSections    uint16
+	trustedProxies []string
+	trustedCIDRs   []*net.IPNet
 }
 
 var _ IRouter = &Engine{}
 
 // New returns a new blank Engine instance without any middleware attached.
 // By default the configuration is:
-// - RedirectTrailingSlash:  true
-// - RedirectFixedPath:      false
-// - HandleMethodNotAllowed: false
 // - ForwardedByClientIP:    true
-// - UseRawPath:             false
 // - UnescapePathValues:     true
 func New() *Engine {
 	debugPrintWARNINGNew()
@@ -160,22 +104,17 @@ func New() *Engine {
 			basePath: "/",
 			root:     true,
 		},
-		FuncMap:                template.FuncMap{},
-		RedirectTrailingSlash:  true,
-		RedirectFixedPath:      false,
-		HandleMethodNotAllowed: false,
-		ForwardedByClientIP:    true,
-		RemoteIPHeaders:        []string{"X-Forwarded-For", "X-Real-IP"},
-		TrustedPlatform:        defaultPlatform,
-		UseRawPath:             false,
-		RemoveExtraSlash:       false,
-		UnescapePathValues:     true,
-		MaxMultipartMemory:     defaultMultipartMemory,
-		trees:                  make(methodTrees, 0, 9),
-		delims:                 render.Delims{Left: "{{", Right: "}}"},
-		secureJSONPrefix:       "while(1);",
-		trustedProxies:         []string{"0.0.0.0/0"},
-		trustedCIDRs:           defaultTrustedCIDRs,
+		FuncMap:             template.FuncMap{},
+		ForwardedByClientIP: true,
+		RemoteIPHeaders:     []string{"X-Forwarded-For", "X-Real-IP"},
+		UseRawPath:          false,
+		UnescapePathValues:  true,
+		MaxMultipartMemory:  defaultMultipartMemory,
+		trees:               make(methodTrees, 0, 9),
+		delims:              render.Delims{Left: "{{", Right: "}}"},
+		secureJSONPrefix:    "while(1);",
+		trustedProxies:      []string{"0.0.0.0/0"},
+		trustedCIDRs:        defaultTrustedCIDRs,
 	}
 	engine.RouterGroup.engine = engine
 	engine.pool.New = func() interface{} {
@@ -220,7 +159,6 @@ func (engine *Engine) NoRoute(handlers ...HandlerFunc) {
 	engine.rebuild404Handlers()
 }
 
-// NoMethod sets the handlers called when Engine.HandleMethodNotAllowed = true.
 func (engine *Engine) NoMethod(handlers ...HandlerFunc) {
 	engine.noMethod = handlers
 	engine.rebuild405Handlers()
@@ -318,7 +256,6 @@ func (engine *Engine) RunTLS(addr, certFile, keyFile string) (err error) {
 	return
 }
 
-
 // ServeHTTP conforms to the http.Handler interface.
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	c := engine.pool.Get().(*Context)
@@ -340,10 +277,6 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 		unescape = engine.UnescapePathValues
 	}
 
-	if engine.RemoveExtraSlash {
-		rPath = cleanPath(rPath)
-	}
-
 	// Find root of the tree for the given HTTP method
 	t := engine.trees
 	for i, tl := 0, len(t); i < tl; i++ {
@@ -363,30 +296,9 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 			c.writermem.WriteHeaderNow()
 			return
 		}
-		if httpMethod != "CONNECT" && rPath != "/" {
-			if value.tsr && engine.RedirectTrailingSlash {
-				redirectTrailingSlash(c)
-				return
-			}
-			if engine.RedirectFixedPath && redirectFixedPath(c, root, engine.RedirectFixedPath) {
-				return
-			}
-		}
 		break
 	}
 
-	if engine.HandleMethodNotAllowed {
-		for _, tree := range engine.trees {
-			if tree.method == httpMethod {
-				continue
-			}
-			if value := tree.root.getValue(rPath, nil, c.skippedNodes, unescape); value.handlers != nil {
-				c.handlers = engine.allNoMethod
-				serveError(c, http.StatusMethodNotAllowed, default405Body)
-				return
-			}
-		}
-	}
 	c.handlers = engine.allNoRoute
 	serveError(c, http.StatusNotFound, default404Body)
 }
@@ -408,31 +320,6 @@ func serveError(c *Context, code int, defaultMessage []byte) {
 		return
 	}
 	c.writermem.WriteHeaderNow()
-}
-
-func redirectTrailingSlash(c *Context) {
-	req := c.Request
-	p := req.URL.Path
-	if prefix := path.Clean(c.Request.Header.Get("X-Forwarded-Prefix")); prefix != "." {
-		p = prefix + "/" + req.URL.Path
-	}
-	req.URL.Path = p + "/"
-	if length := len(p); length > 1 && p[length-1] == '/' {
-		req.URL.Path = p[:length-1]
-	}
-	redirectRequest(c)
-}
-
-func redirectFixedPath(c *Context, root *node, trailingSlash bool) bool {
-	req := c.Request
-	rPath := req.URL.Path
-
-	if fixedPath, ok := root.findCaseInsensitivePath(cleanPath(rPath), trailingSlash); ok {
-		req.URL.Path = bytesconv.BytesToString(fixedPath)
-		redirectRequest(c)
-		return true
-	}
-	return false
 }
 
 func redirectRequest(c *Context) {

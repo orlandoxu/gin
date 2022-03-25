@@ -6,9 +6,7 @@ package gin
 
 import (
 	"net/http"
-	"path"
 	"regexp"
-	"strings"
 )
 
 // IRouter defines all router handle interface includes single and group router.

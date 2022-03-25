@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"mime/multipart"
 	"net"
@@ -27,8 +26,6 @@ import (
 
 // Content-Type MIME of the most common data formats.
 const (
-	MIMEJSON              = binding.MIMEJSON
-	MIMEHTML              = binding.MIMEHTML
 	MIMEXML               = binding.MIMEXML
 	MIMEXML2              = binding.MIMEXML2
 	MIMEPlain             = binding.MIMEPlain
@@ -597,9 +594,7 @@ func (c *Context) SaveUploadedFile(file *multipart.FileHeader, dst string) error
 // Bind checks the Content-Type to select a binding engine automatically,
 // Depending the "Content-Type" header different bindings are used:
 //     "application/json" --> JSON binding
-//     "application/xml"  --> XML binding
 // otherwise --> returns an error.
-// It parses the request's body as JSON if Content-Type == "application/json" using JSON or XML as a JSON input.
 // It decodes the json payload into the struct specified as a pointer.
 // It writes a 400 error and sets Content-Type header "text/plain" in the response if input is not valid.
 func (c *Context) Bind(obj interface{}) error {
@@ -656,9 +651,7 @@ func (c *Context) MustBindWith(obj interface{}, b binding.Binding) error {
 // ShouldBind checks the Content-Type to select a binding engine automatically,
 // Depending the "Content-Type" header different bindings are used:
 //     "application/json" --> JSON binding
-//     "application/xml"  --> XML binding
 // otherwise --> returns an error
-// It parses the request's body as JSON if Content-Type == "application/json" using JSON or XML as a JSON input.
 // It decodes the json payload into the struct specified as a pointer.
 // Like c.Bind() but this method does not set the response status code to 400 and abort if the json is not valid.
 func (c *Context) ShouldBind(obj interface{}) error {
@@ -734,22 +727,6 @@ func (c *Context) ShouldBindBodyWith(obj interface{}, bb binding.BindingBody) (e
 // If the headers are not syntactically valid OR the remote IP does not correspond to a trusted proxy,
 // the remote IP (coming form Request.RemoteAddr) is returned.
 func (c *Context) ClientIP() string {
-	// Check if we're running on a trusted platform, continue running backwards if error
-	if c.engine.TrustedPlatform != "" {
-		// Developers can define their own header of Trusted Platform or use predefined constants
-		if addr := c.requestHeader(c.engine.TrustedPlatform); addr != "" {
-			return addr
-		}
-	}
-
-	// Legacy "AppEngine" flag
-	if c.engine.AppEngine {
-		log.Println(`The AppEngine flag is going to be deprecated. Please check issues #2723 and #2739 and use 'TrustedPlatform: gin.PlatformGoogleAppEngine' instead.`)
-		if addr := c.requestHeader("X-Appengine-Remote-Addr"); addr != "" {
-			return addr
-		}
-	}
-
 	remoteIP, trusted := c.RemoteIP()
 	if remoteIP == nil {
 		return ""
@@ -929,14 +906,6 @@ func (c *Context) Render(code int, r render.Render) {
 	}
 }
 
-// HTML renders the HTTP template specified by its file name.
-// It also updates the HTTP code and sets the Content-Type as "text/html".
-// See http://golang.org/doc/articles/wiki/
-func (c *Context) HTML(code int, name string, obj interface{}) {
-	instance := c.engine.HTMLRender.Instance(name, obj)
-	c.Render(code, instance)
-}
-
 // IndentedJSON serializes the given struct as pretty JSON (indented + endlines) into the response body.
 // It also sets the Content-Type as "application/json".
 // WARNING: we recommend to use this only for development purposes since printing pretty JSON is
@@ -980,17 +949,6 @@ func (c *Context) AsciiJSON(code int, obj interface{}) {
 // PureJSON, unlike JSON, does not replace special html characters with their unicode entities.
 func (c *Context) PureJSON(code int, obj interface{}) {
 	c.Render(code, render.PureJSON{Data: obj})
-}
-
-// XML serializes the given struct as XML into the response body.
-// It also sets the Content-Type as "application/xml".
-func (c *Context) XML(code int, obj interface{}) {
-	c.Render(code, render.XML{Data: obj})
-}
-
-// YAML serializes the given struct as YAML into the response body.
-func (c *Context) YAML(code int, obj interface{}) {
-	c.Render(code, render.YAML{Data: obj})
 }
 
 // ProtoBuf serializes the given struct as ProtoBuf into the response body.
@@ -1079,24 +1037,11 @@ type Negotiate struct {
 	Data     interface{}
 }
 
-// Negotiate calls different Render according acceptable Accept format.
 func (c *Context) Negotiate(code int, config Negotiate) {
 	switch c.NegotiateFormat(config.Offered...) {
 	case binding.MIMEJSON:
 		data := chooseData(config.JSONData, config.Data)
 		c.JSON(code, data)
-
-	case binding.MIMEHTML:
-		data := chooseData(config.HTMLData, config.Data)
-		c.HTML(code, config.HTMLName, data)
-
-	case binding.MIMEXML:
-		data := chooseData(config.XMLData, config.Data)
-		c.XML(code, data)
-
-	case binding.MIMEYAML:
-		data := chooseData(config.YAMLData, config.Data)
-		c.YAML(code, data)
 
 	default:
 		c.AbortWithError(http.StatusNotAcceptable, errors.New("the accepted formats are not offered by the server")) // nolint: errcheck
