@@ -743,17 +743,6 @@ func (c *Context) ClientIP() string {
 	return remoteIP.String()
 }
 
-func (e *Engine) isTrustedProxy(ip net.IP) bool {
-	if e.trustedCIDRs != nil {
-		for _, cidr := range e.trustedCIDRs {
-			if cidr.Contains(ip) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // RemoteIP parses the IP from Request.RemoteAddr, normalizes and returns the IP (without the port).
 // It also checks if the remoteIP is a trusted proxy or not.
 // In order to perform this validation, it will see if the IP is contained within at least one of the CIDR blocks
@@ -768,7 +757,7 @@ func (c *Context) RemoteIP() (net.IP, bool) {
 		return nil, false
 	}
 
-	return remoteIP, c.engine.isTrustedProxy(remoteIP)
+	return remoteIP, false
 }
 
 func (e *Engine) validateHeader(header string) (clientIP string, valid bool) {
@@ -785,7 +774,7 @@ func (e *Engine) validateHeader(header string) (clientIP string, valid bool) {
 
 		// X-Forwarded-For is appended by proxy
 		// Check IPs in reverse order and stop when find untrusted proxy
-		if (i == 0) || (!e.isTrustedProxy(ip)) {
+		if i == 0 {
 			return ipStr, true
 		}
 	}
@@ -912,13 +901,6 @@ func (c *Context) Render(code int, r render.Render) {
 // more CPU and bandwidth consuming. Use Context.JSON() instead.
 func (c *Context) IndentedJSON(code int, obj interface{}) {
 	c.Render(code, render.IndentedJSON{Data: obj})
-}
-
-// SecureJSON serializes the given struct as Secure JSON into the response body.
-// Default prepends "while(1)," to response body if the given struct is array values.
-// It also sets the Content-Type as "application/json".
-func (c *Context) SecureJSON(code int, obj interface{}) {
-	c.Render(code, render.SecureJSON{Prefix: c.engine.secureJSONPrefix, Data: obj})
 }
 
 // JSONP serializes the given struct as JSON into the response body.

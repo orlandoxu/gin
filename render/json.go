@@ -24,12 +24,6 @@ type IndentedJSON struct {
 	Data interface{}
 }
 
-// SecureJSON contains the given interface object and its prefix.
-type SecureJSON struct {
-	Prefix string
-	Data   interface{}
-}
-
 // JsonpJSON contains the given interface object its callback.
 type JsonpJSON struct {
 	Callback string
@@ -87,30 +81,6 @@ func (r IndentedJSON) Render(w http.ResponseWriter) error {
 
 // WriteContentType (IndentedJSON) writes JSON ContentType.
 func (r IndentedJSON) WriteContentType(w http.ResponseWriter) {
-	writeContentType(w, jsonContentType)
-}
-
-// Render (SecureJSON) marshals the given interface object and writes it with custom ContentType.
-func (r SecureJSON) Render(w http.ResponseWriter) error {
-	r.WriteContentType(w)
-	jsonBytes, err := json.Marshal(r.Data)
-	if err != nil {
-		return err
-	}
-	// if the jsonBytes is array values
-	if bytes.HasPrefix(jsonBytes, bytesconv.StringToBytes("[")) && bytes.HasSuffix(jsonBytes,
-		bytesconv.StringToBytes("]")) {
-		_, err = w.Write(bytesconv.StringToBytes(r.Prefix))
-		if err != nil {
-			return err
-		}
-	}
-	_, err = w.Write(jsonBytes)
-	return err
-}
-
-// WriteContentType (SecureJSON) writes JSON ContentType.
-func (r SecureJSON) WriteContentType(w http.ResponseWriter) {
 	writeContentType(w, jsonContentType)
 }
 

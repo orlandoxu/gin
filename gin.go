@@ -6,7 +6,6 @@ package gin
 
 import (
 	"html/template"
-	"net"
 	"net/http"
 	"sync"
 
@@ -19,8 +18,6 @@ var (
 	default404Body = []byte("404 page not found")
 	default405Body = []byte("405 method not allowed")
 )
-
-var defaultTrustedCIDRs = []*net.IPNet{{IP: net.IP{0x0, 0x0, 0x0, 0x0}, Mask: net.IPMask{0x0, 0x0, 0x0, 0x0}}} // 0.0.0.0/0
 
 // HandlerFunc defines the handler used by gin middleware as return value.
 type HandlerFunc func(*Context)
@@ -74,9 +71,7 @@ type Engine struct {
 	// method call.
 	MaxMultipartMemory int64
 
-	delims           render.Delims
-	secureJSONPrefix string
-	//HTMLRender       render.HTMLRender
+	delims         render.Delims
 	FuncMap        template.FuncMap
 	allNoRoute     HandlersChain
 	allNoMethod    HandlersChain
@@ -87,7 +82,6 @@ type Engine struct {
 	maxParams      uint16
 	maxSections    uint16
 	trustedProxies []string
-	trustedCIDRs   []*net.IPNet
 }
 
 var _ IRouter = &Engine{}
@@ -112,9 +106,7 @@ func New() *Engine {
 		MaxMultipartMemory:  defaultMultipartMemory,
 		trees:               make(methodTrees, 0, 9),
 		delims:              render.Delims{Left: "{{", Right: "}}"},
-		secureJSONPrefix:    "while(1);",
 		trustedProxies:      []string{"0.0.0.0/0"},
-		trustedCIDRs:        defaultTrustedCIDRs,
 	}
 	engine.RouterGroup.engine = engine
 	engine.pool.New = func() interface{} {
@@ -134,18 +126,6 @@ func (engine *Engine) allocateContext() *Context {
 	v := make(Params, 0, engine.maxParams)
 	skippedNodes := make([]skippedNode, 0, engine.maxSections)
 	return &Context{engine: engine, params: &v, skippedNodes: &skippedNodes}
-}
-
-// Delims sets template left and right delims and returns a Engine instance.
-func (engine *Engine) Delims(left, right string) *Engine {
-	engine.delims = render.Delims{Left: left, Right: right}
-	return engine
-}
-
-// SecureJsonPrefix sets the secureJSONPrefix used in Context.SecureJSON.
-func (engine *Engine) SecureJsonPrefix(prefix string) *Engine {
-	engine.secureJSONPrefix = prefix
-	return engine
 }
 
 // SetFuncMap sets the FuncMap used for template.FuncMap.
@@ -319,19 +299,5 @@ func serveError(c *Context, code int, defaultMessage []byte) {
 		}
 		return
 	}
-	c.writermem.WriteHeaderNow()
-}
-
-func redirectRequest(c *Context) {
-	req := c.Request
-	rPath := req.URL.Path
-	rURL := req.URL.String()
-
-	code := http.StatusMovedPermanently // Permanent redirect, request with GET method
-	if req.Method != http.MethodGet {
-		code = http.StatusTemporaryRedirect
-	}
-	debugPrint("redirecting request %d: %s --> %s", code, rPath, rURL)
-	http.Redirect(c.Writer, req, rURL, code)
 	c.writermem.WriteHeaderNow()
 }

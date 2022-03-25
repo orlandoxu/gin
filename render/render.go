@@ -17,16 +17,13 @@ type Render interface {
 var (
 	_ Render     = JSON{}
 	_ Render     = IndentedJSON{}
-	_ Render     = SecureJSON{}
 	_ Render     = JsonpJSON{}
-	_ Render     = XML{}
 	_ Render     = String{}
 	_ Render     = Redirect{}
 	_ Render     = Data{}
 	_ Render     = HTML{}
 	_ HTMLRender = HTMLDebug{}
 	_ HTMLRender = HTMLProduction{}
-	_ Render     = YAML{}
 	_ Render     = Reader{}
 	_ Render     = AsciiJSON{}
 	_ Render     = ProtoBuf{}
